@@ -177,18 +177,15 @@ dweep - ICS Development Workspace Setup Tool v$DWEEP_VERSION
 
 USAGE:
     dweep -setup workspace           Setup a new development workspace
-    dweep spec create <system-name>  Create specifications repository
+    dweep spec create <system-name>  Create unified specifications repository
     dweep spec link <repo-url>       Link existing specifications repository
-    dweep docs create <system-name>  Create documentation repository
-    dweep docs link <repo-url>       Link existing documentation repository
     dweep -list                      List existing workspaces
     dweep -help                      Show this help message
     dweep -version                   Show version information
 
 EXAMPLES:
     dweep -setup workspace           # Interactive workspace setup
-    dweep spec create IslandManagementService  # Create specs repo
-    dweep docs create IslandManagementService  # Create docs repo
+    dweep spec create IslandManagementService  # Create unified specs repo
     dweep spec link https://github.com/IslandComputingServices/IslandManagementServiceSpecifications.git
     dweep -list                      # Show all workspaces
 
@@ -196,6 +193,11 @@ REQUIREMENTS:
     - macOS M3 and later
     - Git, GitHub CLI (gh), and Q CLI installed
     - ~/workspaces directory (created automatically)
+
+DEPLOYMENT CONFIGS:
+    - Place in /packages/{SystemName}{Type}/deploymentconfig/
+    - Examples: IslandManagementServiceService, UserDashboardWebsite
+    - /scripts may symlink to deploymentconfig directory
 
 EOF
 }
@@ -934,7 +936,7 @@ create_spec_repository() {
     local system_name="$1"
     local repo_name="${system_name}Specifications"
     
-    log_info "Creating specifications repository: $repo_name"
+    log_info "Creating unified specifications repository: $repo_name"
     
     # Check if we're in a workspace
     if [[ ! -f ".dweep/config.json" ]]; then
@@ -949,28 +951,35 @@ create_spec_repository() {
     # Initialize git repository
     git init
     
-    # Create basic specification structure
-    mkdir -p {requirements,api,architecture,processes}
+    # Create unified specification and documentation structure
+    mkdir -p {requirements,api,architecture,user-guides,deployment,operations,troubleshooting}
     
     # Create README
     cat > README.md << EOF
 # ${system_name} Specifications
 
-System specifications and requirements for ${system_name}.
+Unified specifications and documentation repository for ${system_name}.
 
 ## Structure
 
+### Specifications
 - \`requirements/\` - System requirements and user stories
 - \`api/\` - API specifications and contracts
 - \`architecture/\` - System architecture documents
-- \`processes/\` - Business process definitions
+
+### Documentation
+- \`user-guides/\` - End user documentation
+- \`deployment/\` - Deployment and installation guides
+- \`operations/\` - Operational procedures and runbooks
+- \`troubleshooting/\` - Common issues and solutions
 
 ## Guidelines
 
 - All specifications must be reviewed before implementation
 - Changes to specifications require separate commits from code
 - Use clear, measurable acceptance criteria
-- Follow ICS specification standards
+- Keep documentation current with system changes
+- Follow ICS specification and documentation standards
 
 ## License
 
@@ -998,17 +1007,39 @@ EOF
 [Define measurable success criteria]
 EOF
     
+    # Create initial user guide
+    cat > user-guides/getting-started.md << EOF
+# ${system_name} Getting Started Guide
+
+## Overview
+
+[Brief system overview for end users]
+
+## Prerequisites
+
+[List what users need before using the system]
+
+## Quick Start
+
+[Step-by-step quick start instructions]
+
+## Next Steps
+
+[Links to more detailed documentation]
+EOF
+    
     # Initial commit
     git add .
-    git commit -m "Initial commit: ${system_name} specifications repository
+    git commit -m "Initial commit: ${system_name} unified specifications repository
 
-- Basic specification structure
-- Requirements, API, architecture, processes directories
-- Initial system overview template
-- README with guidelines"
+- Combined specifications and documentation structure
+- Requirements, API, architecture specifications
+- User guides, deployment, operations documentation
+- Initial system overview and getting started templates
+- README with guidelines for spec/doc separation"
     
     # Create GitHub repository
-    gh repo create "IslandComputingServices/$repo_name" --public --description "${system_name} specifications and requirements"
+    gh repo create "IslandComputingServices/$repo_name" --public --description "${system_name} unified specifications and documentation repository"
     
     # Add remote and push
     git remote add origin "https://github.com/IslandComputingServices/$repo_name.git"
@@ -1019,8 +1050,9 @@ EOF
     # Create symlink at workspace root
     ln -sf "$repo_name" specifications
     
-    log_success "Created specifications repository: $repo_name"
+    log_success "Created unified specifications repository: $repo_name"
     log_info "Linked as: specifications/ -> $repo_name/"
+    log_info "Contains both specifications and documentation"
 }
 
 # Link existing specifications repository
@@ -1047,104 +1079,6 @@ link_spec_repository() {
     
     log_success "Linked specifications repository: $repo_name"
     log_info "Available as: specifications/ -> $repo_name/"
-}
-
-# Create documentation repository
-create_docs_repository() {
-    local system_name="$1"
-    local repo_name="${system_name}Documentation"
-    
-    log_info "Creating documentation repository: $repo_name"
-    
-    # Check if we're in a workspace
-    if [[ ! -f ".dweep/config.json" ]]; then
-        log_error "Not in a dweep workspace. Run from workspace root."
-        exit 1
-    fi
-    
-    # Create repository directory
-    mkdir -p "$repo_name"
-    cd "$repo_name"
-    
-    # Initialize git repository
-    git init
-    
-    # Create basic documentation structure
-    mkdir -p {user-guides,deployment,operations,troubleshooting}
-    
-    # Create README
-    cat > README.md << EOF
-# ${system_name} Documentation
-
-User and operational documentation for ${system_name}.
-
-## Structure
-
-- \`user-guides/\` - End user documentation
-- \`deployment/\` - Deployment and installation guides
-- \`operations/\` - Operational procedures and runbooks
-- \`troubleshooting/\` - Common issues and solutions
-
-## Guidelines
-
-- Keep documentation current with system changes
-- Use clear, step-by-step instructions
-- Include screenshots and examples where helpful
-- Follow ICS documentation standards
-
-## License
-
-Copyright © 2025 Island Computing Services. All rights reserved.
-EOF
-    
-    # Initial commit
-    git add .
-    git commit -m "Initial commit: ${system_name} documentation repository
-
-- Basic documentation structure
-- User guides, deployment, operations, troubleshooting directories
-- README with guidelines"
-    
-    # Create GitHub repository
-    gh repo create "IslandComputingServices/$repo_name" --public --description "${system_name} user and operational documentation"
-    
-    # Add remote and push
-    git remote add origin "https://github.com/IslandComputingServices/$repo_name.git"
-    git push -u origin main
-    
-    cd ..
-    
-    # Create symlink at workspace root
-    ln -sf "$repo_name" docs
-    
-    log_success "Created documentation repository: $repo_name"
-    log_info "Linked as: docs/ -> $repo_name/"
-}
-
-# Link existing documentation repository
-link_docs_repository() {
-    local repo_url="$1"
-    local repo_name
-    
-    # Extract repository name from URL
-    repo_name=$(basename "$repo_url" .git)
-    
-    log_info "Linking documentation repository: $repo_name"
-    
-    # Check if we're in a workspace
-    if [[ ! -f ".dweep/config.json" ]]; then
-        log_error "Not in a dweep workspace. Run from workspace root."
-        exit 1
-    fi
-    
-    # Clone repository
-    git clone "$repo_url"
-    
-    # Create symlink at workspace root
-    ln -sf "$repo_name" docs
-    
-    log_success "Linked documentation repository: $repo_name"
-    log_info "Available as: docs/ -> $repo_name/"
 }
 
 # Main function
@@ -1180,30 +1114,6 @@ main() {
                     ;;
                 *)
                     log_error "Usage: dweep spec {create|link} <args>"
-                    exit 1
-                    ;;
-            esac
-            ;;
-        docs)
-            case "${2:-}" in
-                create)
-                    if [[ -n "${3:-}" ]]; then
-                        create_docs_repository "$3"
-                    else
-                        log_error "Usage: dweep docs create <system-name>"
-                        exit 1
-                    fi
-                    ;;
-                link)
-                    if [[ -n "${3:-}" ]]; then
-                        link_docs_repository "$3"
-                    else
-                        log_error "Usage: dweep docs link <repo-url>"
-                        exit 1
-                    fi
-                    ;;
-                *)
-                    log_error "Usage: dweep docs {create|link} <args>"
                     exit 1
                     ;;
             esac
