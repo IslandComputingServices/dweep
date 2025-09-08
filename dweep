@@ -179,15 +179,26 @@ USAGE:
     dweep -setup workspace           Setup a new development workspace
     dweep spec create <system-name>  Create unified specifications repository
     dweep spec link <repo-url>       Link existing specifications repository
+    dweep ai init                    Initialize AI context management
+    dweep ai read                    Read current AI context
+    dweep ai update                  Update AI context with current state
+    dweep ai log "<decision>"        Log AI decision to context
     dweep -list                      List existing workspaces
     dweep -help                      Show this help message
     dweep -version                   Show version information
 
 EXAMPLES:
-    dweep -setup workspace           # Interactive workspace setup
+    dweep -setup workspace           # Interactive workspace setup (includes AI context)
     dweep spec create IslandManagementService  # Create unified specs repo
-    dweep spec link https://github.com/IslandComputingServices/IslandManagementServiceSpecifications.git
-    dweep -list                      # Show all workspaces
+    dweep ai read                    # Get current context for AI session
+    dweep ai update                  # Refresh context after changes
+    dweep ai log "Fixed Smithy validation errors"  # Log decision
+
+AI CONTEXT WORKFLOW:
+    1. Always run 'dweep ai read' before AI interactions
+    2. Include context in AI prompts for continuity
+    3. Run 'dweep ai update' after significant changes
+    4. Use 'dweep ai log' to record important decisions
 
 REQUIREMENTS:
     - macOS M3 and later
@@ -1055,6 +1066,178 @@ EOF
     log_info "Contains both specifications and documentation"
 }
 
+# AI Context Management Functions
+
+# Initialize AI context for workspace
+init_ai_context() {
+    local workspace_dir="$1"
+    
+    log_info "Initializing AI context management for workspace"
+    
+    # Create AI context directory
+    mkdir -p "$workspace_dir/.ai-context"
+    
+    # Create context files
+    cat > "$workspace_dir/.ai-context/session-state.md" << 'EOF'
+# AI Session Context
+
+## Current Session
+- **Started**: [TIMESTAMP]
+- **Workspace**: [WORKSPACE_NAME]
+- **System**: [SYSTEM_NAME]
+- **Last Updated**: [TIMESTAMP]
+
+## Active Rules
+- Follow ICS Core Standards
+- Use dweep for all workspace operations
+- Validate directory structure before operations
+- Place deployment configs in /packages/{SystemName}{Type}/deploymentconfig/
+- Specifications in unified {SystemName}Specifications repository
+
+## Current State
+- **Repositories**: [LIST_REPOS]
+- **Recent Changes**: [RECENT_COMMITS]
+- **Active Branch**: [CURRENT_BRANCH]
+- **Pending Tasks**: [TASK_LIST]
+
+## Key Decisions Made
+- [DECISION_LOG]
+
+## Next Steps
+- [ACTION_ITEMS]
+EOF
+
+    cat > "$workspace_dir/.ai-context/context-template.md" << 'EOF'
+# AI Context Template
+
+Use this template for every AI interaction:
+
+## Session Continuity Check
+"Previous context: [BRIEF_SUMMARY]
+If this is a new session or model change, please acknowledge and confirm understanding of current state."
+
+## Current Context
+- Workspace: [WORKSPACE_PATH]
+- System: [SYSTEM_NAME]
+- Active repositories: [REPO_LIST]
+- Recent changes: [LAST_3_COMMITS]
+- Current task: [CURRENT_TASK]
+
+## Rules Reminder
+- Use dweep for workspace operations
+- Follow ICS Core Standards
+- Validate directory structure
+- Update context after significant changes
+EOF
+
+    cat > "$workspace_dir/.ai-context/update-context.sh" << 'EOF'
+#!/bin/bash
+# AI Context Update Script
+
+CONTEXT_DIR=".ai-context"
+SESSION_FILE="$CONTEXT_DIR/session-state.md"
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+
+# Update session timestamp
+sed -i '' "s/Last Updated.*/Last Updated**: $TIMESTAMP/" "$SESSION_FILE"
+
+# Update current branch
+CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "N/A")
+sed -i '' "s/Active Branch.*/Active Branch**: $CURRENT_BRANCH/" "$SESSION_FILE"
+
+# Update recent commits
+RECENT_COMMITS=$(git log --oneline -3 2>/dev/null | sed 's/^/  - /' || echo "  - No git repository")
+sed -i '' "/Recent Changes/,/Active Branch/ { /Recent Changes/!{ /Active Branch/!d; }; }" "$SESSION_FILE"
+sed -i '' "/Recent Changes.*/ a\\
+$RECENT_COMMITS" "$SESSION_FILE"
+
+# Update repository list
+REPOS=$(find packages -name ".git" -type d 2>/dev/null | sed 's|packages/||; s|/.git||' | sed 's/^/  - /' || echo "  - No repositories found")
+sed -i '' "/Repositories/,/Recent Changes/ { /Repositories/!{ /Recent Changes/!d; }; }" "$SESSION_FILE"
+sed -i '' "/Repositories.*/ a\\
+$REPOS" "$SESSION_FILE"
+
+echo "AI context updated at $TIMESTAMP"
+EOF
+
+    chmod +x "$workspace_dir/.ai-context/update-context.sh"
+    
+    # Create AI context reading script
+    cat > "$workspace_dir/.ai-context/read-context.sh" << 'EOF'
+#!/bin/bash
+# AI Context Reader Script
+
+CONTEXT_DIR=".ai-context"
+SESSION_FILE="$CONTEXT_DIR/session-state.md"
+
+echo "=== AI SESSION CONTEXT ==="
+echo
+if [[ -f "$SESSION_FILE" ]]; then
+    cat "$SESSION_FILE"
+else
+    echo "No AI context found. Run 'dweep ai init' to initialize."
+fi
+echo
+echo "=== END CONTEXT ==="
+EOF
+
+    chmod +x "$workspace_dir/.ai-context/read-context.sh"
+    
+    # Initialize session state with current info
+    cd "$workspace_dir"
+    WORKSPACE_NAME=$(basename "$PWD")
+    SYSTEM_NAME=$(cat .dweep/system_name 2>/dev/null || echo "Unknown")
+    
+    # Update template with actual values
+    sed -i '' "s/\[TIMESTAMP\]/$TIMESTAMP/g" "$workspace_dir/.ai-context/session-state.md"
+    sed -i '' "s/\[WORKSPACE_NAME\]/$WORKSPACE_NAME/g" "$workspace_dir/.ai-context/session-state.md"
+    sed -i '' "s/\[SYSTEM_NAME\]/$SYSTEM_NAME/g" "$workspace_dir/.ai-context/session-state.md"
+    
+    # Run initial context update
+    ./.ai-context/update-context.sh
+    
+    log_success "AI context management initialized"
+    log_info "Use 'dweep ai read' to get current context"
+    log_info "Use 'dweep ai update' to refresh context"
+}
+
+# Read AI context
+read_ai_context() {
+    if [[ ! -f ".ai-context/session-state.md" ]]; then
+        log_error "No AI context found. Run 'dweep ai init' first."
+        exit 1
+    fi
+    
+    ./.ai-context/read-context.sh
+}
+
+# Update AI context
+update_ai_context() {
+    if [[ ! -f ".ai-context/update-context.sh" ]]; then
+        log_error "No AI context found. Run 'dweep ai init' first."
+        exit 1
+    fi
+    
+    ./.ai-context/update-context.sh
+}
+
+# Add decision to context log
+log_ai_decision() {
+    local decision="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    if [[ ! -f ".ai-context/session-state.md" ]]; then
+        log_error "No AI context found. Run 'dweep ai init' first."
+        exit 1
+    fi
+    
+    # Add decision to log
+    sed -i '' "/Key Decisions Made/a\\
+- [$timestamp] $decision" .ai-context/session-state.md
+    
+    log_info "Decision logged: $decision"
+}
+
 # Link existing specifications repository
 link_spec_repository() {
     local repo_url="$1"
@@ -1089,6 +1272,8 @@ main() {
                 check_requirements
                 init_dweep
                 setup_workspace
+                # Initialize AI context after workspace setup
+                init_ai_context "$(pwd)"
             else
                 log_error "Usage: dweep -setup workspace"
                 exit 1
@@ -1099,6 +1284,8 @@ main() {
                 create)
                     if [[ -n "${3:-}" ]]; then
                         create_spec_repository "$3"
+                        update_ai_context
+                        log_ai_decision "Created specifications repository: ${3}Specifications"
                     else
                         log_error "Usage: dweep spec create <system-name>"
                         exit 1
@@ -1107,6 +1294,8 @@ main() {
                 link)
                     if [[ -n "${3:-}" ]]; then
                         link_spec_repository "$3"
+                        update_ai_context
+                        log_ai_decision "Linked specifications repository: $3"
                     else
                         log_error "Usage: dweep spec link <repo-url>"
                         exit 1
@@ -1114,6 +1303,31 @@ main() {
                     ;;
                 *)
                     log_error "Usage: dweep spec {create|link} <args>"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        ai)
+            case "${2:-}" in
+                init)
+                    init_ai_context "$(pwd)"
+                    ;;
+                read)
+                    read_ai_context
+                    ;;
+                update)
+                    update_ai_context
+                    ;;
+                log)
+                    if [[ -n "${3:-}" ]]; then
+                        log_ai_decision "$3"
+                    else
+                        log_error "Usage: dweep ai log \"<decision>\""
+                        exit 1
+                    fi
+                    ;;
+                *)
+                    log_error "Usage: dweep ai {init|read|update|log} [args]"
                     exit 1
                     ;;
             esac
