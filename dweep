@@ -399,7 +399,28 @@ create_workspace() {
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > "$workspace_path/.dweep/created_at"
     echo "$DWEEP_VERSION" > "$workspace_path/.dweep/dweep_version"
     
+    # Create .gitignore to prevent workspace commits
+    cat > "$workspace_path/.gitignore" << 'EOF'
+# WORKSPACE GITIGNORE - PREVENTS ACCIDENTAL COMMITS
+# This workspace should NEVER be committed to version control
+
+# Ignore everything by default
+*
+
+# Allow this .gitignore file
+!.gitignore
+
+# Allow README files for documentation
+!README.md
+!WORKSPACE_STRUCTURE.md
+!AI_AGENT_INSTRUCTIONS.md
+
+# Individual repositories manage their own version control
+# Workspace is only a container for multiple repositories
+EOF
+    
     log_success "Created workspace directory: $workspace_path"
+    log_warning "IMPORTANT: Workspace is NOT a git repository and should NEVER be committed"
 }
 
 # Setup new system structure
