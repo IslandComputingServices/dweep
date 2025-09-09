@@ -1250,51 +1250,25 @@ update_ai_context() {
 maintain_decision_history() {
     local session_file=".ai-context/session-state.md"
     local history_file=".ai-context/decision-history.md"
-    local current_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local cutoff_time=$(date -d '24 hours ago' '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -v-24H '+%Y-%m-%d %H:%M:%S')
+    local temp_file=$(mktemp)
     
-    # Create history file if it doesn't exist
-    if [[ ! -f "$history_file" ]]; then
-        cat > "$history_file" << 'EOF'
+    # Create clean history file
+    cat > "$temp_file" << 'EOF'
 # AI Decision History (Last 24 Hours)
 
 ## Recent Decisions
 EOF
-    fi
     
-    # Extract decisions from session file and add to history
-    if [[ -f "$session_file" ]]; then
-        grep "^\- \[" "$session_file" | while read -r decision; do
-            # Check if decision is already in history
-            if ! grep -Fq "$decision" "$history_file" 2>/dev/null; then
-                echo "$decision" >> "$history_file"
-            fi
-        done
-    fi
+    # Collect all unique decisions from both files
+    {
+        grep "^\- \[" "$session_file" 2>/dev/null || true
+        grep "^\- \[" "$history_file" 2>/dev/null || true
+    } | grep -v "\[DECISION_LOG\]" | sort -u | tail -20 >> "$temp_file"
     
-    # Clean old decisions (older than 24 hours)
-    if [[ -f "$history_file" ]]; then
-        # Create temp file with recent decisions only
-        local temp_file=$(mktemp)
-        echo "# AI Decision History (Last 24 Hours)" > "$temp_file"
-        echo "" >> "$temp_file"
-        echo "## Recent Decisions" >> "$temp_file"
-        
-        # Filter decisions from last 24 hours
-        grep "^\- \[" "$history_file" | while read -r decision; do
-            # Extract timestamp from decision
-            local decision_time=$(echo "$decision" | sed -n 's/.*\[\([0-9-]* [0-9:]*\)\].*/\1/p')
-            if [[ -n "$decision_time" ]]; then
-                # Compare timestamps (simplified - keep all for now, can enhance later)
-                echo "$decision" >> "$temp_file"
-            fi
-        done
-        
-        # Replace history file with filtered content
-        mv "$temp_file" "$history_file"
-    fi
+    # Replace history file
+    mv "$temp_file" "$history_file"
     
-    # Update session file to reference history
+    # Update session file with clean structure
     update_session_with_history
 }
 
@@ -1302,63 +1276,44 @@ EOF
 update_session_with_history() {
     local session_file=".ai-context/session-state.md"
     local history_file=".ai-context/decision-history.md"
+    local temp_session=$(mktemp)
     
-    if [[ -f "$history_file" && -f "$session_file" ]]; then
-        # Create enhanced session state with history
-        local temp_session=$(mktemp)
-        
-        # Copy everything up to "Key Decisions Made"
-        sed '/## Key Decisions Made/,$d' "$session_file" > "$temp_session"
-        
-        # Add enhanced decision section
-        cat >> "$temp_session" << 'EOF'
-## Key Decisions Made (Last 24 Hours)
-EOF
-        
-        # Add recent decisions from history (last 10)
-        grep "^\- \[" "$history_file" | tail -10 >> "$temp_session" 2>/dev/null || echo "- No recent decisions" >> "$temp_session"
-        
-        # Add current session decisions
-        echo "" >> "$temp_session"
-        echo "## Current Session Decisions" >> "$temp_session"
-        sed -n '/## Key Decisions Made/,/## Next Steps/p' "$session_file" | grep "^\- \[" >> "$temp_session" 2>/dev/null || echo "- No current session decisions" >> "$temp_session"
-        
-        # Add next steps
-        echo "" >> "$temp_session"
-        echo "## Next Steps" >> "$temp_session"
-        sed -n '/## Next Steps/,$p' "$session_file" | tail -n +2 >> "$temp_session"
-        
-        # Replace session file
-        mv "$temp_session" "$session_file"
-    fi
+    # Copy everything up to "Key Decisions Made"
+    sed '/## Key Decisions Made/,$d' "$session_file" > "$temp_session"
+    
+    # Add clean decision section
+    echo "## Key Decisions Made (Last 24 Hours)" >> "$temp_session"
+    grep "^\- \[" "$history_file" 2>/dev/null | head -10 >> "$temp_session" || echo "- No recent decisions" >> "$temp_session"
+    
+    echo "" >> "$temp_session"
+    echo "## Next Steps" >> "$temp_session"
+    echo "- [ACTION_ITEMS]" >> "$temp_session"
+    
+    # Replace session file
+    mv "$temp_session" "$session_file"
 }
 
 # Add decision to context log
 log_ai_decision() {
     local decision="$1"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local decision_entry="- [$timestamp] $decision"
     
     if [[ ! -f ".ai-context/session-state.md" ]]; then
         log_error "No AI context found. Run 'dweep ai init' first."
         exit 1
     fi
     
-    # Add decision to current session
-    sed -i '' "/Current Session Decisions/a\\
-- [$timestamp] $decision" .ai-context/session-state.md 2>/dev/null || \
-    sed -i '' "/Key Decisions Made/a\\
-- [$timestamp] $decision" .ai-context/session-state.md
-    
-    # Also add to persistent history
+    # Add to history file directly (avoid duplicates)
     local history_file=".ai-context/decision-history.md"
-    if [[ -f "$history_file" ]]; then
+    if [[ -f "$history_file" ]] && ! grep -Fq "$decision_entry" "$history_file"; then
         sed -i '' "/## Recent Decisions/a\\
-- [$timestamp] $decision" "$history_file"
+$decision_entry" "$history_file"
     fi
     
     log_info "Decision logged: $decision"
     
-    # Update context to maintain history
+    # Update context to maintain clean history
     maintain_decision_history
 }
 
