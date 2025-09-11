@@ -100,7 +100,8 @@ check_git_configuration() {
         echo "  gh auth login"
         echo
         echo "This is required to access ICS Core Standards repository."
-        read -p "Continue anyway? (y/N): " continue_choice
+        printf "Continue anyway? (y/N): "
+        read continue_choice
         if [[ "$continue_choice" != "y" && "$continue_choice" != "Y" ]]; then
             exit 1
         fi
@@ -258,12 +259,13 @@ setup_workspace() {
     
     # Ask for workspace type
     echo "Select workspace type:"
-    echo "1) New Service (microservice/API)"
+    echo "1) New Service (Service/SOA API)"
     echo "2) New Worker (background processing)"
     echo "3) New Website (frontend application)"
     echo "4) Existing System (checkout existing codebase)"
     echo
-    read -p "Enter choice (1-4): " workspace_type
+    printf "Enter choice (1-4): "
+    read workspace_type
     
     case $workspace_type in
         1) setup_new_service "$username" ;;
@@ -281,7 +283,8 @@ setup_new_service() {
     local workspace_name
     
     echo
-    read -p "Enter service name (e.g., IslandManagementService): " service_name
+    printf "Enter service name (e.g., IslandManagementService): "
+    read service_name
     
     if [[ -z "$service_name" ]]; then
         log_error "Service name cannot be empty"
@@ -289,7 +292,8 @@ setup_new_service() {
     fi
     
     workspace_name="${service_name}-${username}"
-    read -p "Workspace name [$workspace_name]: " custom_name
+    printf "Workspace name [$workspace_name]: "
+    read custom_name
     
     if [[ -n "$custom_name" ]]; then
         workspace_name="$custom_name"
@@ -306,7 +310,8 @@ setup_new_worker() {
     local workspace_name
     
     echo
-    read -p "Enter worker name (e.g., IslandProvisioningWorker): " worker_name
+    printf "Enter worker name (e.g., IslandProvisioningWorker): "
+    read worker_name
     
     if [[ -z "$worker_name" ]]; then
         log_error "Worker name cannot be empty"
@@ -314,7 +319,8 @@ setup_new_worker() {
     fi
     
     workspace_name="${worker_name}-${username}"
-    read -p "Workspace name [$workspace_name]: " custom_name
+    printf "Workspace name [$workspace_name]: "
+    read custom_name
     
     if [[ -n "$custom_name" ]]; then
         workspace_name="$custom_name"
@@ -331,7 +337,8 @@ setup_new_website() {
     local workspace_name
     
     echo
-    read -p "Enter website name (e.g., IslandConsole): " website_name
+    printf "Enter website name (e.g., IslandConsole): "
+    read website_name
     
     if [[ -z "$website_name" ]]; then
         log_error "Website name cannot be empty"
@@ -339,7 +346,8 @@ setup_new_website() {
     fi
     
     workspace_name="${website_name}-${username}"
-    read -p "Workspace name [$workspace_name]: " custom_name
+    printf "Workspace name [$workspace_name]: "
+    read custom_name
     
     if [[ -n "$custom_name" ]]; then
         workspace_name="$custom_name"
@@ -356,7 +364,8 @@ setup_existing_system() {
     local workspace_name
     
     echo
-    read -p "Enter existing system name: " system_name
+    printf "Enter existing system name: "
+    read system_name
     
     if [[ -z "$system_name" ]]; then
         log_error "System name cannot be empty"
@@ -364,7 +373,8 @@ setup_existing_system() {
     fi
     
     workspace_name="${system_name}-${username}"
-    read -p "Workspace name [$workspace_name]: " custom_name
+    printf "Workspace name [$workspace_name]: "
+    read custom_name
     
     if [[ -n "$custom_name" ]]; then
         workspace_name="$custom_name"
